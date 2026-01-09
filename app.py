@@ -57,10 +57,7 @@ def carregar_ia():
     # Usando o modelo BASE para caber na memória do servidor grátis
     # Se você gerou o PKL com o LARGE, idealmente gere de novo com o BASE.
     # Mas o código tenta carregar mesmo assim.
-    try:
-        model_emb = SentenceTransformer("intfloat/multilingual-e5-base")
-    except:
-        model_emb = SentenceTransformer("intfloat/multilingual-e5-large")
+    model_emb = SentenceTransformer("intfloat/multilingual-e5-large")
         
     # Carrega Banco de Dados
     # O arquivo precisa estar na mesma pasta no GitHub
