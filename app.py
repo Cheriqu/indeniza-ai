@@ -62,6 +62,11 @@ def carregar_ia():
     # 2. Carrega Cross-Encoder (O Juiz Digital)
     # Usando Unicamp-DL para evitar erros de repositório
     cross_encoder = CrossEncoder("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
+
+    # Usando o modelo BASE para caber na memória do servidor grátis
+    # Se você gerou o PKL com o LARGE, idealmente gere de novo com o BASE.
+    # Mas o código tenta carregar mesmo assim.
+    model_emb = SentenceTransformer("intfloat/multilingual-e5-large")
         
     # 3. Carrega Banco de Dados
     with open("banco_vetorial_tjpr_e5.pkl", "rb") as f:
