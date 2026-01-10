@@ -72,7 +72,7 @@ st.markdown("""
 def carregar_modelos_ia():
     # Carrega os modelos neurais (pesados) apenas uma vez
     bi_encoder = SentenceTransformer("intfloat/multilingual-e5-large")
-    cross_encoder = CrossEncoder("cross-esconder/mmarco-mMiniLM-v2-L12-H384-v1")
+    cross_encoder = CrossEncoder("cross-encoder/mmarco-mMiniLM-v2-L12-H384-v1")
     return bi_encoder, cross_encoder
 
 @st.cache_resource
