@@ -20,8 +20,8 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- CSS E JAVASCRIPT PARA ANIMAÇÃO (O TRUQUE DO GIF) ---
-# Injetamos JS para alterar o ícone do título a cada 3 segundos no navegador
+# --- CSS E JAVASCRIPT PARA ANIMAÇÃO (O GIF FALSO) ---
+# Atualizado para trocar entre Avião, Dinheiro e Balança a cada 5 segundos
 st.markdown("""
     <style>
     .main { background-color: #f9f9f9; }
@@ -47,18 +47,18 @@ st.markdown("""
     <script>
     // Função que roda no navegador do cliente
     function animarIcone() {
-        const icones = ["✈️", "💰", "🛑"];
+        const icones = ["✈️", "💰", "⚖️"]; // Adicionada a Balança
         let i = 0;
-        const target = window.parent.document.querySelector('h1'); // Tenta pegar o H1 do Streamlit
+        const target = window.parent.document.querySelector('h1'); 
         if (target) {
             setInterval(() => {
-                // Procura o emoji dentro do texto e substitui
                 let texto = target.innerText;
-                if (texto.includes("✈️") || texto.includes("💰") || texto.includes("🛑")) {
+                // Verifica se tem algum dos ícones para substituir
+                if (texto.includes("✈️") || texto.includes("💰") || texto.includes("⚖️")) {
                      target.innerText = icones[i] + " Indeniza Aí";
                      i = (i + 1) % icones.length;
                 }
-            }, 3000);
+            }, 5000); // Alterado para 5 segundos (5000ms)
         }
     }
     setTimeout(animarIcone, 1000);
@@ -70,9 +70,13 @@ st.markdown("""
 # ==============================================================================
 @st.cache_resource
 def carregar_modelos_ia():
-    # Carrega os modelos neurais (pesados) apenas uma vez
+    # 1. Carrega Bi-Encoder (Busca Inicial)
     bi_encoder = SentenceTransformer("intfloat/multilingual-e5-large")
-    cross_encoder = "cross-encoder/mmarco-mMiniLM-v2-L12-H384-v1"
+    
+    # 2. Carrega Cross-Encoder (O Juiz Digital)
+    # CORREÇÃO AQUI: Inicializando a classe corretamente, não apenas a string
+    cross_encoder = CrossEncoder("cross-encoder/mmarco-mMiniLM-v2-L12-H384-v1")
+    
     return bi_encoder, cross_encoder
 
 @st.cache_resource
@@ -133,11 +137,11 @@ def classificar_desfecho(row):
 # ==============================================================================
 # INTERFACE
 # ==============================================================================
-# Título com ID para o JavaScript achar
-st.markdown("<h1 id='titulo-animado' style='text-align: center;'>✈️ Indeniza Aí</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Descubra suas chances em casos de <b>Voo</b> ou <b>Nome Negativado</b>.</p>", unsafe_allow_html=True)
+# Título com ID para o JavaScript achar (Começa com a balança)
+st.markdown("<h1 id='titulo-animado' style='text-align: center;'>⚖️ Indeniza Aí</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Descubra suas chances em casos de <b>Voo</b>, <b>Nome Negativado</b> e outros.</p>", unsafe_allow_html=True)
 
-# Placeholder dinâmico (Python side)
+# Placeholder dinâmico
 exemplos = "Ex: 'Voo cancelado em Guarulhos...' OU 'Meu nome foi para o Serasa indevidamente...'"
 queixa = st.text_area("Relate seu caso:", placeholder=exemplos, height=140)
 
@@ -174,11 +178,11 @@ if st.button("CALCULAR INDENIZAÇÃO"):
                     motivo_bloqueio = "Texto inválido ou fora da área jurídica."
                 elif resp['categoria'] == 'AEREO':
                     categoria = "AEREO"
-                    arquivo_alvo = "banco_vetorial_tjpr_e5.pkl" # Seu arquivo original
+                    arquivo_alvo = "banco_vetorial_tjpr_e5.pkl" 
                     analise_permitida = True
                 elif resp['categoria'] == 'NOMESUJO':
                     categoria = "NOMESUJO"
-                    arquivo_alvo = "banco_nome_sujo.pkl" # O novo arquivo gerado pela fábrica
+                    arquivo_alvo = "banco_nome_sujo.pkl"
                     analise_permitida = True
                 else:
                     motivo_bloqueio = "No momento só analisamos casos Aéreos ou de Negativação Indevida."
