@@ -87,10 +87,6 @@ st.markdown("""
     </script>
 """, unsafe_allow_html=True)
 
-# Placeholder dinâmico
-exemplos = "Ex: 'Voo cancelado em Guarulhos...' OU 'Meu nome foi para o Serasa indevidamente...'"
-queixa = st.text_area("Relate seu caso:", placeholder=exemplos, height=140)
-
 # ==============================================================================
 # CARREGAMENTO INTELIGENTE (CARREGA SÓ O NECESSÁRIO)
 # ==============================================================================
