@@ -21,66 +21,75 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# ESTILO E ANIMAÇÃO (CSS + JS + HTML TÍTULO)
+# INTERFACE (COM ANIMAÇÃO CORRIGIDA)
 # ==============================================================================
+# Container CSS + HTML + JS tudo junto para garantir que funcionem em sintonia
 st.markdown("""
     <style>
-    .main { background-color: #f9f9f9; }
-    
-    /* Botões */
-    .stButton>button {
-        width: 100%;
-        background-color: #00C853; 
-        color: white; 
-        font-weight: bold;
-        border-radius: 10px; height: 50px; font-size: 18px;
-        border: none;
-    }
-    .stButton>button:hover { background-color: #009624; color: white; }
-    
-    /* Cards */
-    .metric-card {
-        background-color: #ffffff; padding: 20px; border-radius: 10px;
-        border: 1px solid #e0e0e0; box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
-        text-align: center;
-    }
-    
-    /* Título Animado */
-    #titulo-animado { 
-        text-align: center; 
-        color: #1E1E1E;
-        transition: opacity 0.5s ease-in-out;
-    }
-    h2, h3 { color: #1E1E1E; }
+        /* Estilo do Título */
+        .header-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header-container h1 {
+            color: #1E1E1E;
+            font-size: 3.5rem; /* Título bem grande */
+            font-weight: 800;
+            margin: 0;
+        }
+        .header-container p {
+            color: #666;
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+        /* Animação suave para o emoji não "piscar" secamente */
+        #emoji-dinamico {
+            display: inline-block;
+            transition: transform 0.5s ease, opacity 0.5s ease;
+        }
     </style>
 
-    <h1 id='titulo-animado'>⚖️ Indeniza Aí</h1>
-    <p style='text-align: center;'>Descubra suas chances em casos de <b>Voo</b>, <b>Nome Negativado</b> e outros.</p>
+    <div class="header-container">
+        <h1>
+            <span id="emoji-dinamico">⚖️</span> Indeniza Aí
+        </h1>
+        <p>Descubra suas chances em casos de <b>Voo</b>, <b>Nome Negativado</b> e outros.</p>
+    </div>
 
     <script>
-    function iniciarAnimacao() {
-        const icones = ["✈️", "💰", "⚖️"];
-        let index = 0;
+    // Script isolado para evitar conflitos
+    (function() {
+        const emojis = ["✈️", "💰", "⚖️", "🔎"];
+        let indice = 0;
         
-        // Procura o elemento diretamente pelo ID (Sem window.parent)
-        const titulo = document.getElementById('titulo-animado');
-        
-        if (titulo) {
-            setInterval(() => {
-                index = (index + 1) % icones.length;
-                // Troca o ícone mantendo o texto
-                titulo.innerText = icones[index] + " Indeniza Aí";
-            }, 5000); // 5000ms = 5 segundos
+        function trocarEmoji() {
+            const elemento = document.getElementById("emoji-dinamico");
+            if (elemento) {
+                // Efeito visual: Diminui opacidade e rotaciona um pouco antes de trocar
+                elemento.style.opacity = "0";
+                elemento.style.transform = "scale(0.5)";
+                
+                setTimeout(() => {
+                    // Troca o emoji
+                    indice = (indice + 1) % emojis.length;
+                    elemento.innerText = emojis[indice];
+                    
+                    // Volta ao normal
+                    elemento.style.opacity = "1";
+                    elemento.style.transform = "scale(1)";
+                }, 500); // Espera metade do tempo para trocar
+            }
         }
-    }
-    
-    // Tenta rodar assim que carregar
-    iniciarAnimacao();
-    
-    // Garante que roda mesmo se houver um delay no carregamento
-    setTimeout(iniciarAnimacao, 1000);
+
+        // Troca a cada 4.5 segundos
+        setInterval(trocarEmoji, 4500);
+    })();
     </script>
 """, unsafe_allow_html=True)
+
+# Placeholder dinâmico
+exemplos = "Ex: 'Voo cancelado em Guarulhos...' OU 'Meu nome foi para o Serasa indevidamente...'"
+queixa = st.text_area("Relate seu caso:", placeholder=exemplos, height=140)
 
 # ==============================================================================
 # CARREGAMENTO INTELIGENTE (CARREGA SÓ O NECESSÁRIO)
