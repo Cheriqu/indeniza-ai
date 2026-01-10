@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import pickle
 import numpy as np
+import gc
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 from openai import OpenAI
@@ -63,18 +64,16 @@ def carregar_ia():
     # Usando Unicamp-DL para evitar erros de repositório
     cross_encoder = CrossEncoder("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1")
 
-    # Usando o modelo BASE para caber na memória do servidor grátis
-    # Se você gerou o PKL com o LARGE, idealmente gere de novo com o BASE.
-    # Mas o código tenta carregar mesmo assim.
-    model_emb = SentenceTransformer("intfloat/multilingual-e5-large")
-        
     # 3. Carrega Banco de Dados
     with open("banco_vetorial_tjpr_e5.pkl", "rb") as f:
         dados = pickle.load(f)
     
     df = dados["dataframe"]
     vetores = dados["vetores"]
-    
+
+    del dados
+    gc.collect()
+
     # Tratamentos de Dados
     df['valor_dano_moral'] = pd.to_numeric(df['valor_dano_moral'], errors='coerce').fillna(0)
     df['valor_dano_material'] = pd.to_numeric(df.get('valor_dano_material', 0), errors='coerce').fillna(0)
