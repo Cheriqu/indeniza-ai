@@ -10,3 +10,6 @@ resultado_tjsp_furtivo.csv
 scraper_tjpr.py
 scraper_tjsp.py
 simulador_juridico.py
+raw_nome_sujo.csv
+estruturado_nome_sujo.xlsx
+fabrica_jurimetria_tjpr.py
