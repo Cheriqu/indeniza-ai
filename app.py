@@ -72,10 +72,8 @@ st.markdown("""
 def carregar_modelos_ia():
     # 1. Carrega Bi-Encoder (Busca Inicial)
     bi_encoder = SentenceTransformer("intfloat/multilingual-e5-large")
-    
-    # 2. Carrega Cross-Encoder (O Juiz Digital)
-    # CORREÇÃO AQUI: Inicializando a classe corretamente, não apenas a string
-    cross_encoder = CrossEncoder("cross-encoder/mmarco-mMiniLM-v2-L12-H384-v1")
+    NOME_CROSS_ENCODER = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    cross_encoder = CrossEncoder(NOME_CROSS_ENCODER)
     
     return bi_encoder, cross_encoder
 
