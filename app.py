@@ -139,7 +139,7 @@ init_db()
 @st.cache_resource
 def carregar_modelos_ia():
     bi_encoder = SentenceTransformer("intfloat/multilingual-e5-large")
-    cross_encoder = CrossEncoder("unicamp-dl/mmarco-mMiniLM-v2-L12-H384-v1")
+    cross_encoder = CrossEncoder("cross-encoder/mmarco-mMiniLM-v2-L12-H384-v1")
     return bi_encoder, cross_encoder
 
 @st.cache_resource
