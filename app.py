@@ -20,48 +20,65 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- CSS E JAVASCRIPT PARA ANIMAÇÃO (O GIF FALSO) ---
-# Atualizado para trocar entre Avião, Dinheiro e Balança a cada 5 segundos
+# ==============================================================================
+# ESTILO E ANIMAÇÃO (CSS + JS + HTML TÍTULO)
+# ==============================================================================
 st.markdown("""
     <style>
     .main { background-color: #f9f9f9; }
+    
+    /* Botões */
     .stButton>button {
         width: 100%;
         background-color: #00C853; 
         color: white; 
         font-weight: bold;
         border-radius: 10px; height: 50px; font-size: 18px;
+        border: none;
     }
     .stButton>button:hover { background-color: #009624; color: white; }
+    
+    /* Cards */
     .metric-card {
         background-color: #ffffff; padding: 20px; border-radius: 10px;
         border: 1px solid #e0e0e0; box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
         text-align: center;
     }
-    h1, h2, h3 { color: #1E1E1E; }
     
-    /* ID para o título animado */
-    #titulo-animado { transition: all 0.5s ease; }
+    /* Título Animado */
+    #titulo-animado { 
+        text-align: center; 
+        color: #1E1E1E;
+        transition: opacity 0.5s ease-in-out;
+    }
+    h2, h3 { color: #1E1E1E; }
     </style>
-    
+
+    <h1 id='titulo-animado'>⚖️ Indeniza Aí</h1>
+    <p style='text-align: center;'>Descubra suas chances em casos de <b>Voo</b>, <b>Nome Negativado</b> e outros.</p>
+
     <script>
-    // Função que roda no navegador do cliente
-    function animarIcone() {
-        const icones = ["✈️", "💰", "⚖️"]; // Adicionada a Balança
-        let i = 0;
-        const target = window.parent.document.querySelector('h1'); 
-        if (target) {
+    function iniciarAnimacao() {
+        const icones = ["✈️", "💰", "⚖️"];
+        let index = 0;
+        
+        // Procura o elemento diretamente pelo ID (Sem window.parent)
+        const titulo = document.getElementById('titulo-animado');
+        
+        if (titulo) {
             setInterval(() => {
-                let texto = target.innerText;
-                // Verifica se tem algum dos ícones para substituir
-                if (texto.includes("✈️") || texto.includes("💰") || texto.includes("⚖️")) {
-                     target.innerText = icones[i] + " Indeniza Aí";
-                     i = (i + 1) % icones.length;
-                }
-            }, 5000); // Alterado para 5 segundos (5000ms)
+                index = (index + 1) % icones.length;
+                // Troca o ícone mantendo o texto
+                titulo.innerText = icones[index] + " Indeniza Aí";
+            }, 5000); // 5000ms = 5 segundos
         }
     }
-    setTimeout(animarIcone, 1000);
+    
+    // Tenta rodar assim que carregar
+    iniciarAnimacao();
+    
+    // Garante que roda mesmo se houver um delay no carregamento
+    setTimeout(iniciarAnimacao, 1000);
     </script>
 """, unsafe_allow_html=True)
 
