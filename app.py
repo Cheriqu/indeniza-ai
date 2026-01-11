@@ -315,59 +315,72 @@ if menu == "Sou Cliente":
                 </div>
                 """, unsafe_allow_html=True)
                 
+                # ... (dentro da lógica do Paywall) ...
+                
                 with st.form("form_pagamento"):
-                    c_nome = st.text_input("Nome Completo")
-                    c_email = st.text_input("E-mail (Para receber o relatório)")
-                    c_whats = st.text_input("WhatsApp (com DDD)")
-                    c_cidade = st.text_input("Cidade/Estado")
-                    c_check = st.checkbox("Aceito que advogados entrem em contato.")
+                    c_nome = st.text_input("Seu Nome Completo")
+                    # DICA: Aqui você vai usar o email do comprador de teste!
+                    c_email = st.text_input("Seu E-mail") 
+                    c_whats = st.text_input("WhatsApp")
+                    c_cidade = st.text_input("Cidade")
+                    c_check = st.checkbox("Aceito contato de advogados.")
                     
                     st.divider()
                     st.write("Valor do Relatório: **R$ 9,90**")
-                    submitted = st.form_submit_button("GERAR PIX PARA LIBERAR")
+                    submitted = st.form_submit_button("IR PARA PAGAMENTO SEGURO")
 
                     if submitted:
                         if len(c_nome) > 3 and len(c_email) > 5:
-                            # --- SUBSTUIÇÃO DO BLOCO DE PAGAMENTO PARA DEBUG ---
+                            # 1. Configura SDK (Pega sua chave dos secrets)
                             sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
-                            payment_data = {
-                                "transaction_amount": 0.10, # Valor baixo para teste (R$ 0,10)
-                                "description": "Teste IndenizaAí",
-                                "payment_method_id": "pix",
+                            
+                            # 2. Cria Preferência (Checkout Pro - Igual ao Manual)
+                            preference_data = {
+                                "items": [
+                                    {
+                                        "title": "Relatório IndenizaAí",
+                                        "quantity": 1,
+                                        "unit_price": 9.90
+                                    }
+                                ],
                                 "payer": {
                                     "email": c_email,
-                                    "first_name": c_nome,
-                                    "identification": {
-                                        "type": "CPF",
-                                        "number": "19119119100" # CPF genérico apenas para validar estrutura
-                                    }
-                                }
+                                    "name": c_nome
+                                },
+                                # Redireciona o usuário de volta pro seu site depois
+                                "back_urls": {
+                                    "success": "https://indenizaapp.com.br/?status=aprovado",
+                                    "failure": "https://indenizaapp.com.br/?status=falha",
+                                    "pending": "https://indenizaapp.com.br/?status=pendente"
+                                },
+                                "auto_return": "approved"
                             }
-                            
-                            payment_response = sdk.payment().create(payment_data)
-                            
-                            # AQUI ESTÁ O SEGREDO: Verificamos se deu certo antes de pegar o ID
-                            if payment_response["status"] == 201:
-                                pagamento = payment_response["response"]
-                                st.session_state.pagamento_id = pagamento['id']
-                                st.session_state.qr_code_copia = pagamento['point_of_interaction']['transaction_data']['qr_code']
-                                st.session_state.aguardando_pagamento = True
+
+                            try:
+                                preference_response = sdk.preference().create(preference_data)
+                                preference = preference_response["response"]
                                 
-                                # Salva Lead
-                                salvar_lead({
-                                    "nome": c_nome, "email": c_email, "whatsapp": c_whats, 
-                                    "cidade": c_cidade, "resumo": dados['resumo'], 
-                                    "categoria": dados['categoria'], "prob": dados['prob'], 
-                                    "valor": dados['valor'], "pagou": False, 
-                                    "payment_id": str(pagamento['id']), "aceita_advogado": c_check
-                                })
+                                # Pega o link correto (Sandbox para testes ou Init Point para produção)
+                                # O código abaixo tenta pegar o link de teste primeiro
+                                link_pagamento = preference.get('sandbox_init_point', preference.get('init_point'))
+                                
+                                st.session_state.link_pagamento = link_pagamento
+                                st.session_state.aguardando_pagamento = True
                                 st.rerun()
-                            else:
-                                # Mostra o erro real na tela
-                                st.error("❌ O Mercado Pago recusou o pedido.")
-                                st.json(payment_response) # Vai mostrar o JSON detalhado do erro
-                        else:
-                            st.warning("Preencha os dados corretamente.")
+                                
+                            except Exception as e:
+                                st.error(f"Erro ao criar pagamento: {e}")
+
+                # 3. Exibe o Botão de Pagamento
+                if st.session_state.get('aguardando_pagamento'):
+                    with st.container(border=True):
+                        st.success("✅ Pedido Criado com Sucesso!")
+                        st.markdown("Clique abaixo para testar com Cartão ou PIX:")
+                        
+                        # Botão que leva para o Mercado Pago
+                        st.link_button("PAGAR AGORA (MERCADO PAGO) 🔒", st.session_state.link_pagamento)
+                        
+                        st.info("💡 Dica: Use os cartões do manual (ex: Master final 6351) para aprovar na hora.")
                 
                 # Exibe PIX se gerado
                 if st.session_state.get('aguardando_pagamento'):
