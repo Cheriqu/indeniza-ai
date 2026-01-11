@@ -317,10 +317,12 @@ if menu == "Sou Cliente":
                 
                 # ... (dentro da lógica do Paywall) ...
                 
+                # ... (dentro da lógica do Paywall) ...
+                
                 with st.form("form_pagamento"):
-                    c_nome = st.text_input("Seu Nome Completo")
-                    # DICA: Aqui você vai usar o email do comprador de teste!
-                    c_email = st.text_input("Seu E-mail") 
+                    st.write("📝 **Dados para Pagamento**")
+                    c_nome = st.text_input("Nome Completo")
+                    c_email = st.text_input("E-mail (Use o de teste!)") 
                     c_whats = st.text_input("WhatsApp")
                     c_cidade = st.text_input("Cidade")
                     c_check = st.checkbox("Aceito contato de advogados.")
@@ -331,23 +333,13 @@ if menu == "Sou Cliente":
 
                     if submitted:
                         if len(c_nome) > 3 and len(c_email) > 5:
-                            # 1. Configura SDK (Pega sua chave dos secrets)
+                            # 1. Configura SDK
                             sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
                             
-                            # 2. Cria Preferência (Checkout Pro - Igual ao Manual)
+                            # 2. Cria Preferência
                             preference_data = {
-                                "items": [
-                                    {
-                                        "title": "Relatório IndenizaAí",
-                                        "quantity": 1,
-                                        "unit_price": 9.90
-                                    }
-                                ],
-                                "payer": {
-                                    "email": c_email,
-                                    "name": c_nome
-                                },
-                                # Redireciona o usuário de volta pro seu site depois
+                                "items": [{"title": "Relatório IndenizaAí", "quantity": 1, "unit_price": 9.90}],
+                                "payer": {"email": c_email, "name": c_nome},
                                 "back_urls": {
                                     "success": "https://indenizaapp.com.br/?status=aprovado",
                                     "failure": "https://indenizaapp.com.br/?status=falha",
@@ -360,16 +352,31 @@ if menu == "Sou Cliente":
                                 preference_response = sdk.preference().create(preference_data)
                                 preference = preference_response["response"]
                                 
-                                # Pega o link correto (Sandbox para testes ou Init Point para produção)
-                                # O código abaixo tenta pegar o link de teste primeiro
-                                link_pagamento = preference.get('sandbox_init_point', preference.get('init_point'))
+                                # Tenta pegar o link (Sandbox ou Produção)
+                                link_pagamento = preference.get('sandbox_init_point') or preference.get('init_point')
                                 
-                                st.session_state.link_pagamento = link_pagamento
-                                st.session_state.aguardando_pagamento = True
-                                st.rerun()
+                                if link_pagamento:
+                                    st.session_state.link_pagamento = link_pagamento
+                                    st.session_state.aguardando_pagamento = True
+                                    st.rerun()
+                                else:
+                                    # SE ENTRAR AQUI, É PORQUE DEU ERRO NO MERCADO PAGO
+                                    st.error("❌ O Mercado Pago não gerou o link.")
+                                    st.json(preference_response) # Mostra o erro detalhado na tela!
                                 
                             except Exception as e:
-                                st.error(f"Erro ao criar pagamento: {e}")
+                                st.error(f"Erro de conexão: {e}")
+
+                # 3. Exibe o Botão SOMENTE se o link for válido
+                if st.session_state.get('aguardando_pagamento') and st.session_state.get('link_pagamento'):
+                    with st.container(border=True):
+                        st.success("✅ Pedido Criado com Sucesso!")
+                        st.markdown("Clique abaixo para testar com Cartão ou PIX:")
+                        
+                        # Agora é seguro criar o botão
+                        st.link_button("PAGAR AGORA (MERCADO PAGO) 🔒", st.session_state.link_pagamento)
+                        
+                        st.info("💡 Dica: Use os cartões do manual (Master final 6351) e o nome 'APRO' para aprovar.")
 
                 # 3. Exibe o Botão de Pagamento
                 if st.session_state.get('aguardando_pagamento'):
