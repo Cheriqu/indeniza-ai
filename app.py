@@ -330,21 +330,32 @@ if menu == "Sou Cliente":
                         if len(c_nome) > 3 and len(c_email) > 5:
                             # INTEGRAÇÃO MERCADO PAGO
                             try:
+                                # --- SUBSTUIÇÃO DO BLOCO DE PAGAMENTO PARA DEBUG ---
                                 sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
                                 payment_data = {
-                                    "transaction_amount": 9.90,
-                                    "description": "Relatório IndenizaAí",
+                                    "transaction_amount": 0.10, # Valor baixo para teste (R$ 0,10)
+                                    "description": "Teste IndenizaAí",
                                     "payment_method_id": "pix",
-                                    "payer": {"email": c_email, "first_name": c_nome}
-                                }
-                                payment_response = sdk.payment().create(payment_data)
+                                    "payer": {
+                                        "email": c_email,
+                                        "first_name": c_nome,
+                                        "identification": {
+                                            "type": "CPF",
+                                            "number": "19119119100" # CPF genérico apenas para validar estrutura
+                                        }
+                                 }
+                            }
+                            
+                            payment_response = sdk.payment().create(payment_data)
+                            
+                            # AQUI ESTÁ O SEGREDO: Verificamos se deu certo antes de pegar o ID
+                            if payment_response["status"] == 201:
                                 pagamento = payment_response["response"]
-                                
                                 st.session_state.pagamento_id = pagamento['id']
                                 st.session_state.qr_code_copia = pagamento['point_of_interaction']['transaction_data']['qr_code']
                                 st.session_state.aguardando_pagamento = True
                                 
-                                # Salva Lead Pendente
+                                # Salva Lead
                                 salvar_lead({
                                     "nome": c_nome, "email": c_email, "whatsapp": c_whats, 
                                     "cidade": c_cidade, "resumo": dados['resumo'], 
@@ -353,8 +364,10 @@ if menu == "Sou Cliente":
                                     "payment_id": str(pagamento['id']), "aceita_advogado": c_check
                                 })
                                 st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao gerar PIX: {e}")
+                            else:
+                                # Mostra o erro real na tela
+                                st.error("❌ O Mercado Pago recusou o pedido.")
+                                st.json(payment_response) # Vai mostrar o JSON detalhado do erro
                         else:
                             st.warning("Preencha os dados corretamente.")
                 
