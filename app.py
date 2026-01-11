@@ -331,53 +331,46 @@ if menu == "Sou Cliente":
                     st.write("Valor do Relatório: **R$ 9,90**")
                     submitted = st.form_submit_button("IR PARA PAGAMENTO SEGURO")
 
-                    if submitted:
-                        if len(c_nome) > 3 and len(c_email) > 5:
-                            # 1. Configura SDK
-                            sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
+                    # ... (dentro do formulário) ...
+                if submitted:
+                    if len(c_nome) > 3 and len(c_email) > 5:
+                        sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
+                        
+                        preference_data = {
+                            "items": [{"title": "Relatório IndenizaAí", "quantity": 1, "unit_price": 9.90}],
+                            "payer": {"email": c_email, "name": c_nome},
+                            "back_urls": {
+                                "success": "https://indenizaapp.com.br/?status=aprovado",
+                                "failure": "https://indenizaapp.com.br/?status=falha",
+                                "pending": "https://indenizaapp.com.br/?status=pendente"
+                            },
+                            "auto_return": "approved"
+                        }
+
+                        try:
+                            preference_response = sdk.preference().create(preference_data)
+                            preference = preference_response["response"]
                             
-                            # 2. Cria Preferência
-                            preference_data = {
-                                "items": [{"title": "Relatório IndenizaAí", "quantity": 1, "unit_price": 9.90}],
-                                "payer": {"email": c_email, "name": c_nome},
-                                "back_urls": {
-                                    "success": "https://indenizaapp.com.br/?status=aprovado",
-                                    "failure": "https://indenizaapp.com.br/?status=falha",
-                                    "pending": "https://indenizaapp.com.br/?status=pendente"
-                                },
-                                "auto_return": "approved"
-                            }
+                            # Tenta pegar o link (Prioridade para Sandbox/Teste)
+                            link = preference.get('sandbox_init_point') or preference.get('init_point')
+                            
+                            if link:
+                                # SÓ ENTRA AQUI SE O LINK EXISTIR DE VERDADE
+                                st.session_state.link_pagamento = link
+                                st.session_state.aguardando_pagamento = True
+                                st.rerun() # Recarrega a página para mostrar o botão
+                            else:
+                                st.error("❌ O Mercado Pago não gerou o link. Verifique o erro abaixo:")
+                                st.json(preference_response) # Mostra o erro real
+                                
+                        except Exception as e:
+                            st.error(f"Erro de conexão: {e}")
 
-                            try:
-                                preference_response = sdk.preference().create(preference_data)
-                                preference = preference_response["response"]
-                                
-                                # Tenta pegar o link (Sandbox ou Produção)
-                                link_pagamento = preference.get('sandbox_init_point') or preference.get('init_point')
-                                
-                                if link_pagamento:
-                                    st.session_state.link_pagamento = link_pagamento
-                                    st.session_state.aguardando_pagamento = True
-                                    st.rerun()
-                                else:
-                                    # SE ENTRAR AQUI, É PORQUE DEU ERRO NO MERCADO PAGO
-                                    st.error("❌ O Mercado Pago não gerou o link.")
-                                    st.json(preference_response) # Mostra o erro detalhado na tela!
-                                
-                            except Exception as e:
-                                st.error(f"Erro de conexão: {e}")
-
-                # 3. Exibe o Botão SOMENTE se o link for válido
+                # 3. Exibe o Botão SOMENTE se tudo estiver validado
                 if st.session_state.get('aguardando_pagamento') and st.session_state.get('link_pagamento'):
                     with st.container(border=True):
                         st.success("✅ Pedido Criado com Sucesso!")
-                        st.markdown("Clique abaixo para testar com Cartão ou PIX:")
-                        
-                        # Agora é seguro criar o botão
                         st.link_button("PAGAR AGORA (MERCADO PAGO) 🔒", st.session_state.link_pagamento)
-                        
-                        st.info("💡 Dica: Use os cartões do manual (Master final 6351) e o nome 'APRO' para aprovar.")
-
                 # 3. Exibe o Botão de Pagamento
                 if st.session_state.get('aguardando_pagamento'):
                     with st.container(border=True):
