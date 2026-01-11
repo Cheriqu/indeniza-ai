@@ -328,22 +328,20 @@ if menu == "Sou Cliente":
 
                     if submitted:
                         if len(c_nome) > 3 and len(c_email) > 5:
-                            # INTEGRAÇÃO MERCADO PAGO
-                            try:
-                                # --- SUBSTUIÇÃO DO BLOCO DE PAGAMENTO PARA DEBUG ---
-                                sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
-                                payment_data = {
-                                    "transaction_amount": 0.10, # Valor baixo para teste (R$ 0,10)
-                                    "description": "Teste IndenizaAí",
-                                    "payment_method_id": "pix",
-                                    "payer": {
-                                        "email": c_email,
-                                        "first_name": c_nome,
-                                        "identification": {
-                                            "type": "CPF",
-                                            "number": "19119119100" # CPF genérico apenas para validar estrutura
-                                        }
-                                 }
+                            # --- SUBSTUIÇÃO DO BLOCO DE PAGAMENTO PARA DEBUG ---
+                            sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
+                            payment_data = {
+                                "transaction_amount": 0.10, # Valor baixo para teste (R$ 0,10)
+                                "description": "Teste IndenizaAí",
+                                "payment_method_id": "pix",
+                                "payer": {
+                                    "email": c_email,
+                                    "first_name": c_nome,
+                                    "identification": {
+                                        "type": "CPF",
+                                        "number": "19119119100" # CPF genérico apenas para validar estrutura
+                                    }
+                                }
                             }
                             
                             payment_response = sdk.payment().create(payment_data)
