@@ -13,3 +13,5 @@ simulador_juridico.py
 raw_nome_sujo.csv
 estruturado_nome_sujo.xlsx
 fabrica_jurimetria_tjpr.py
+Dockerfile
+token_ml.txt

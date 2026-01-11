@@ -6,7 +6,7 @@ import gc
 import json
 import time
 import sqlite3
-import hashlib
+import mercadopago  # BIBLIOTECA DE PAGAMENTO
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 from openai import OpenAI
@@ -36,10 +36,10 @@ st.markdown("""
     
     /* Efeito de Borrão (Blur) para o Paywall */
     .blur-content {
-        filter: blur(5px);
+        filter: blur(8px);
         pointer-events: none;
         user-select: none;
-        opacity: 0.6;
+        opacity: 0.5;
     }
     
     /* Caixa do Paywall */
@@ -77,6 +77,7 @@ def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     data_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
                     nome TEXT,
+                    email TEXT,
                     whatsapp TEXT,
                     cidade TEXT,
                     resumo_caso TEXT,
@@ -84,10 +85,11 @@ def init_db():
                     probabilidade REAL,
                     valor_estimado REAL,
                     pagou BOOLEAN DEFAULT 0,
+                    payment_id TEXT,
                     aceita_advogado BOOLEAN DEFAULT 0
                 )''')
     
-    # Tabela de Advogados (Login Simples)
+    # Tabela de Advogados
     c.execute('''CREATE TABLE IF NOT EXISTS advogados (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     email TEXT UNIQUE,
@@ -96,7 +98,7 @@ def init_db():
                     ativo BOOLEAN DEFAULT 1
                 )''')
     
-    # Cria um advogado admin padrão se não existir (Email: admin / Senha: admin)
+    # Cria Admin padrão
     try:
         c.execute("INSERT INTO advogados (email, senha, nome) VALUES (?, ?, ?)", 
                  ('admin', 'admin', 'Administrador'))
@@ -109,10 +111,17 @@ def init_db():
 def salvar_lead(dados):
     conn = sqlite3.connect('indeniza.db')
     c = conn.cursor()
-    c.execute('''INSERT INTO leads (nome, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, pagou, aceita_advogado)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                 (dados['nome'], dados['whatsapp'], dados['cidade'], dados['resumo'], 
-                  dados['categoria'], dados['prob'], dados['valor'], dados['pagou'], dados['aceita_advogado']))
+    c.execute('''INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, pagou, payment_id, aceita_advogado)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+                 (dados['nome'], dados['email'], dados['whatsapp'], dados['cidade'], dados['resumo'], 
+                  dados['categoria'], dados['prob'], dados['valor'], dados['pagou'], dados.get('payment_id'), dados['aceita_advogado']))
+    conn.commit()
+    conn.close()
+
+def atualizar_pagamento_lead(payment_id):
+    conn = sqlite3.connect('indeniza.db')
+    c = conn.cursor()
+    c.execute("UPDATE leads SET pagou = 1 WHERE payment_id = ?", (str(payment_id),))
     conn.commit()
     conn.close()
 
@@ -130,17 +139,21 @@ def verificar_login_advogado(email, senha):
     conn.close()
     return result
 
-# Inicializa o banco ao abrir
+# Inicializa Banco
 init_db()
 
 # ==============================================================================
-# CARREGAMENTO DE IA (Igual ao anterior)
+# CARREGAMENTO DE IA (CORRIGIDO)
 # ==============================================================================
 @st.cache_resource
 def carregar_modelos_ia():
     bi_encoder = SentenceTransformer("intfloat/multilingual-e5-large")
+    
+    # --- SUA REGRA DE OURO ---
     NOME_CROSS_ENCODER = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
     cross_encoder = CrossEncoder(NOME_CROSS_ENCODER)
+    # -------------------------
+    
     return bi_encoder, cross_encoder
 
 @st.cache_resource
@@ -153,7 +166,7 @@ def carregar_banco_dados(arquivo_pkl):
         del dados
         gc.collect()
         
-        # Tratamento de dados
+        # Tratamento
         df['valor_dano_moral'] = pd.to_numeric(df['valor_dano_moral'], errors='coerce').fillna(0)
         df['valor_dano_material'] = pd.to_numeric(df.get('valor_dano_material', 0), errors='coerce').fillna(0)
         df['valor_total'] = df['valor_dano_moral'] + df['valor_dano_material']
@@ -171,12 +184,17 @@ except Exception as e:
     st.error(f"Erro crítico na IA: {e}")
     st.stop()
 
-api_key = st.secrets.get("OPENROUTER_API_KEY")
-client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key) if api_key else None
+# Configuração de APIs (Compatível com seus Secrets)
+api_key_openai = st.secrets.get("OPENROUTER_API_KEY") 
+# Se a chave estiver dentro de [openai] no secrets, use: st.secrets["openai"]["api_key"]
+# Vou deixar genérico para tentar pegar direto, ajuste no secrets se precisar.
+
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key_openai) if api_key_openai else None
+
 ANO_ATUAL = datetime.now().year
 
 # ==============================================================================
-# FUNÇÕES DE CÁLCULO
+# LÓGICA DE NEGÓCIO
 # ==============================================================================
 def calcular_peso_temporal(data_julg):
     if pd.isna(data_julg): return 0.5
@@ -194,19 +212,17 @@ def classificar_desfecho(row):
     return "VITORIA_COM_VALOR" if float(row.get('valor_total', 0)) > 100 else "DERROTA"
 
 # ==============================================================================
-# INTERFACE PRINCIPAL
+# INTERFACE
 # ==============================================================================
-# Menu Lateral para Advogados
 with st.sidebar:
     st.title("Área Restrita 🔒")
     menu = st.radio("Navegação", ["Sou Cliente", "Sou Advogado"])
 
-# --- PÁGINA DO CLIENTE ---
+# --- CLIENTE ---
 if menu == "Sou Cliente":
     st.markdown("<h1 style='text-align: center;'>⚖️ Indeniza Aí</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #666;'>Analise seu caso com IA e descubra quanto você pode ganhar.</p>", unsafe_allow_html=True)
 
-    # Controle de Estado da Sessão (Para manter dados após clicar em pagar)
     if 'analise_concluida' not in st.session_state: st.session_state.analise_concluida = False
     if 'dados_finais' not in st.session_state: st.session_state.dados_finais = {}
     if 'pagamento_aprovado' not in st.session_state: st.session_state.pagamento_aprovado = False
@@ -217,11 +233,11 @@ if menu == "Sou Cliente":
         if len(queixa) < 15:
             st.warning("⚠️ Descreva melhor o caso.")
         elif not client:
-            st.error("Erro: API Key não configurada.")
+            st.error("Erro: API Key OpenAI não configurada.")
         else:
             with st.spinner("🤖 A IA está lendo jurisprudências..."):
-                # 1. Classificação
                 try:
+                    # 1. Router
                     prompt = f'Analise: "{queixa[:500]}". JSON output: {{"categoria": "AEREO" ou "NOMESUJO" ou "OUTROS", "valido": true/false}}'
                     check = client.chat.completions.create(model="xiaomi/mimo-v2-flash:free", messages=[{"role": "user", "content": prompt}], temperature=0)
                     resp = json.loads(check.choices[0].message.content.replace("```json","").replace("```","").strip())
@@ -232,7 +248,7 @@ if menu == "Sou Cliente":
                     
                     arquivo_alvo = "banco_vetorial_tjpr_e5.pkl" if resp['categoria'] == 'AEREO' else "banco_nome_sujo.pkl"
                     
-                    # 2. Busca e Cálculo
+                    # 2. Busca
                     df, vetores = carregar_banco_dados(arquivo_alvo)
                     if df is None:
                         st.error(f"Banco de dados '{arquivo_alvo}' não encontrado.")
@@ -257,22 +273,21 @@ if menu == "Sou Cliente":
                     if len(financeiro) > 0:
                         val_esperado = np.average(financeiro['valor_total'], weights=financeiro['peso_final'])
                     
-                    # Salva na sessão
                     st.session_state.dados_finais = {
                         "prob": prob, "valor": val_esperado, "df_finais": finais, 
                         "categoria": resp['categoria'], "resumo": queixa
                     }
                     st.session_state.analise_concluida = True
-                    st.rerun() # Recarrega para mostrar resultados
+                    st.rerun()
                     
                 except Exception as e:
                     st.error(f"Erro: {e}")
 
-    # --- TELA DE RESULTADOS ---
+    # --- RESULTADOS ---
     if st.session_state.analise_concluida:
         dados = st.session_state.dados_finais
         
-        # 1. Probabilidade (Grátis - Always Visible)
+        # Probabilidade (Sempre visível)
         cor_prob = "#2ecc71" if dados['prob'] > 70 else "#f1c40f"
         st.markdown(f"""
             <div class='metric-card' style='border-left: 5px solid {cor_prob};'>
@@ -282,66 +297,94 @@ if menu == "Sou Cliente":
             </div>
         """, unsafe_allow_html=True)
 
-        # 2. Área Protegida (Paywall ou Desbloqueado)
+        # === BLOQUEIO DE PAGAMENTO (PAYWALL) ===
         if not st.session_state.pagamento_aprovado:
-            # === MODO BLOQUEADO ===
+            # Conteúdo Borrado (Blur)
             st.markdown("<div class='blur-content'>", unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1: st.markdown("<div class='metric-card'><h3>Valor Estimado</h3><h1>R$ 5.800,00</h1></div>", unsafe_allow_html=True)
             with col2: st.markdown("<div class='metric-card'><h3>Tempo Médio</h3><h1>12 Meses</h1></div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True) # Fim do Blur
+            st.markdown("</div>", unsafe_allow_html=True)
             
-            # Caixa de Conversão
+            # Caixa do Paywall
             with st.container():
                 st.markdown("""
                 <div class='paywall-overlay'>
                     <h2>🔓 Desbloqueie seu Relatório Completo</h2>
-                    <p>Veja o valor exato da indenização, casos semelhantes e receba contato de advogados parceiros.</p>
+                    <p>Veja o valor exato, casos semelhantes e fale com advogados.</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Formulário de Lead
                 with st.form("form_pagamento"):
-                    c_nome = st.text_input("Seu Nome Completo")
-                    c_whats = st.text_input("Seu WhatsApp (com DDD)")
-                    c_cidade = st.text_input("Sua Cidade/Estado")
-                    c_check = st.checkbox("Aceito que advogados parceiros entrem em contato comigo.")
+                    c_nome = st.text_input("Nome Completo")
+                    c_email = st.text_input("E-mail (Para receber o relatório)")
+                    c_whats = st.text_input("WhatsApp (com DDD)")
+                    c_cidade = st.text_input("Cidade/Estado")
+                    c_check = st.checkbox("Aceito que advogados entrem em contato.")
                     
-                    # Opções de Pagamento
                     st.divider()
-                    st.write("Pagamento Único: **R$ 9,90**")
-                    tipo_pag = st.radio("Forma de Pagamento:", ["PIX (Instantâneo)", "Bitcoin (Lightning)"])
-                    
-                    if st.form_submit_button("LIBERAR RELATÓRIO AGORA"):
-                        if len(c_nome) > 3 and len(c_whats) > 8:
-                            # Salva Lead no SQLite
-                            salvar_lead({
-                                "nome": c_nome, "whatsapp": c_whats, "cidade": c_cidade,
-                                "resumo": dados['resumo'], "categoria": dados['categoria'],
-                                "prob": dados['prob'], "valor": dados['valor'],
-                                "pagou": False, "aceita_advogado": c_check
-                            })
-                            st.success("Dados salvos! Redirecionando para pagamento...")
-                            time.sleep(1)
-                            st.session_state.aguardando_pagamento = True
-                            st.rerun()
+                    st.write("Valor do Relatório: **R$ 9,90**")
+                    submitted = st.form_submit_button("GERAR PIX PARA LIBERAR")
+
+                    if submitted:
+                        if len(c_nome) > 3 and len(c_email) > 5:
+                            # INTEGRAÇÃO MERCADO PAGO
+                            try:
+                                sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
+                                payment_data = {
+                                    "transaction_amount": 9.90,
+                                    "description": "Relatório IndenizaAí",
+                                    "payment_method_id": "pix",
+                                    "payer": {"email": c_email, "first_name": c_nome}
+                                }
+                                payment_response = sdk.payment().create(payment_data)
+                                pagamento = payment_response["response"]
+                                
+                                st.session_state.pagamento_id = pagamento['id']
+                                st.session_state.qr_code_copia = pagamento['point_of_interaction']['transaction_data']['qr_code']
+                                st.session_state.aguardando_pagamento = True
+                                
+                                # Salva Lead Pendente
+                                salvar_lead({
+                                    "nome": c_nome, "email": c_email, "whatsapp": c_whats, 
+                                    "cidade": c_cidade, "resumo": dados['resumo'], 
+                                    "categoria": dados['categoria'], "prob": dados['prob'], 
+                                    "valor": dados['valor'], "pagou": False, 
+                                    "payment_id": str(pagamento['id']), "aceita_advogado": c_check
+                                })
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao gerar PIX: {e}")
                         else:
-                            st.warning("Preencha nome e WhatsApp corretamente.")
+                            st.warning("Preencha os dados corretamente.")
                 
-                # Simulação de Pagamento (Isso sairia na versão final)
+                # Exibe PIX se gerado
                 if st.session_state.get('aguardando_pagamento'):
-                    st.info("ℹ️ Aqui apareceria o QR Code do PIX ou Bitcoin.")
-                    if st.button("SIMULAR: Pagamento Aprovado pelo Banco"):
-                        st.session_state.pagamento_aprovado = True
-                        # Atualiza no banco que pagou (pegando o ultimo ID seria o ideal, aqui simplificado)
-                        st.rerun()
+                    with st.container(border=True):
+                        st.info("📱 Pague via PIX (Copia e Cola)")
+                        st.code(st.session_state.qr_code_copia, language="text")
+                        
+                        if st.button("JÁ PAGUEI! LIBERAR RELATÓRIO"):
+                            try:
+                                sdk = mercadopago.SDK(st.secrets["pagamento"]["mp_token"])
+                                check = sdk.payment().get(st.session_state.pagamento_id)
+                                status = check["response"]["status"]
+                                
+                                if status == "approved":
+                                    st.session_state.pagamento_aprovado = True
+                                    atualizar_pagamento_lead(st.session_state.pagamento_id)
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.warning(f"Status atual: {status}. Aguarde alguns segundos...")
+                            except:
+                                st.error("Erro ao verificar pagamento.")
 
         else:
-            # === MODO DESBLOQUEADO (PREMIUM) ===
-            st.balloons()
+            # === DESBLOQUEADO (PREMIUM) ===
             st.success("✅ Relatório Desbloqueado com Sucesso!")
             
-            # Mostra o Valor Real
+            # Valor Real
             st.markdown(f"""
                 <div class='metric-card' style='background-color: #e8f5e9; border: 2px solid #2ecc71;'>
                     <h3>💰 Valor Estimado da Indenização</h3>
@@ -363,7 +406,7 @@ if menu == "Sou Cliente":
                     if row.get('link_acordao'):
                         st.markdown(f"[📄 Ler Documento Original]({row['link_acordao']})")
 
-# --- PÁGINA DO ADVOGADO ---
+# --- ADVOGADO ---
 elif menu == "Sou Advogado":
     st.header("Painel do Advogado Parceiro ⚖️")
     
@@ -378,7 +421,7 @@ elif menu == "Sou Advogado":
                     st.session_state.advogado_logado = user[0]
                     st.rerun()
                 else:
-                    st.error("Acesso negado. Tente email: admin / senha: admin")
+                    st.error("Acesso negado. (Teste: admin/admin)")
     else:
         # Dashboard
         st.write(f"Bem-vindo, Dr(a). {st.session_state.advogado_logado}!")
@@ -387,11 +430,10 @@ elif menu == "Sou Advogado":
             st.rerun()
             
         st.divider()
-        st.subheader("🔥 Leads Recentes (Clientes Potenciais)")
+        st.subheader("🔥 Leads Recentes")
         
         df_leads = listar_leads()
         if not df_leads.empty:
-            # Filtros
             cidade_filter = st.multiselect("Filtrar por Cidade", df_leads['cidade'].unique())
             if cidade_filter:
                 df_leads = df_leads[df_leads['cidade'].isin(cidade_filter)]
@@ -403,11 +445,12 @@ elif menu == "Sou Advogado":
                         st.markdown(f"**{row['nome']}**")
                         st.caption(f"{row['cidade']} | {row['data_registro']}")
                     with c2:
-                        st.info(f"Prob: {row['probabilidade']:.0f}% | Est: R$ {row['valor_estimado']:,.0f}")
+                        status_pag = "✅ PAGO" if row['pagou'] else "❌ PENDENTE"
+                        st.info(f"Prob: {row['probabilidade']:.0f}% | {status_pag}")
                         st.write(f"Caso: {row['resumo_caso'][:100]}...")
                     with c3:
                         if row['aceita_advogado']:
-                            st.link_button("Chamar no WhatsApp", f"https://wa.me/55{row['whatsapp'].replace(' ','').replace('-','')}")
+                            st.link_button("Chamar no WhatsApp", f"https://wa.me/55{str(row['whatsapp']).replace(' ','').replace('-','')}")
                         else:
                             st.caption("Contato não autorizado")
         else:
